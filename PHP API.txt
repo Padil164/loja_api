@@ -1,0 +1,270 @@
+
+=================================================================================================================
+
+- Comeca por criar uma pasta/projeto dentro da pasta raiz do laragon chamada "api";
+- E outra pasta para o prjeto da aplicacao chamada app;
+- Abre os dois prpjetos ao mesmo tempo no visual studio code, abrindo a pasta de api e depois selecionando a opcao adicionar pasta ao workspace e depois seleciona a opcao save workspace as api_app.
+
+
+=================================================CONSTRUCAO RUDIMENTAR DE UMA API================================================================
+
+- A ideia e fazer uma api que receb por url um GET, e se o GET for de uma variavel option que tenha o valor status deve retornar um json , se nao entao debe retornar outro json de erro:
+
+<?php
+
+// request
+
+$data = [];
+
+if(isset($_GET['option'])){
+    switch ($_GET['option']) {
+        case 'status':
+            $data['status'] = 'SUCCESS';
+            $data['data'] = 'API running OK!';
+            break;
+        
+        default:
+        $data['status'] = 'ERROR';
+        break;
+    }
+}else{
+    $data['status'] = 'ERROR';
+}
+
+// emitir a resposta da api
+response($data);
+
+// construcao da response
+
+function response($data_response){
+    header("Content-Type:application/json"); // função response com os dados que deseja enviar como resposta, ela primeiro define o cabeçalho Content-Type como application/json, indicando que o conteúdo a seguir é JSON. Em seguida, converte os dados fornecidos para JSON usando a função json_encode() do PHP.
+    echo json_encode($data_response);
+}
+
+=================================================CONSTRUCAO RUDIMENTAR DE UMA APLICACAO CONSUMIDORA DA API================================================================
+
+- A ideia aqui e fazer uma aplicacao que faz a requisicao da url da api:
+
+
+<?php
+
+define('API_BASE', 'http://localhost/api/?option=');
+
+echo "<h3>APLICACAO</h3><hr>";
+
+$resultado = api_request('status');
+echo $resultado;
+
+function api_request($option){
+    $client = curl_init(API_BASE . $option); // Isso inicializa uma nova sessão cURL com a URL da API fornecida concatenada com a opção desejada. API_BASE é a URL base da API, e $option é a parte variável da URL que pode mudar dependendo da operação desejada na API.
+    curl_setopt($client, CURLOPT_RETURNTRANSFER, true); // Essa opção faz com que a função curl_exec retorne o resultado da requisição como uma string em vez de imprimi-la diretamente. Isso é útil para capturar a resposta da API e manipulá-la posteriormente no código.
+    $response = curl_exec($client); //  Isso executa a requisição cURL e armazena o resultado na variável $response. Essa função executa a requisição HTTP e retorna o resultado, que pode ser o conteúdo da resposta ou false em caso de erro.
+    return $response;
+}
+
+
+Tambem podes retornar a resposta em forma de array associativo:
+
+function api_request($option){
+    $client = curl_init(API_BASE . $option);
+    curl_setopt($client, CURLOPT_RETURNTRANSFER, true);
+    $response = curl_exec($client);
+    return json_decode($response, true);
+}
+
+=================================================MELHORAR E OPTIMIZAR API================================================================
+
+- Melhorar o codigo e adicionar mais um case a api, um case que vai retornar valores aleatorios no intervalo de 0 a 1000:
+
+
+<?php
+
+// prepare response
+$data['status'] = "ERROR";
+$data['data'] = null;
+
+//request
+if(isset($_GET['option'])){
+    switch ($_GET['option']) {
+        case 'status':
+            define_response($data, 'API running OK!');
+            break;
+        case 'random':
+            define_response($data, rand(0,1000));
+            break;
+    }
+}
+
+// emitir a resposta da api
+response($data);
+
+//===========================================================
+function define_response(&$data, $value){
+    $data['status'] = 'SUCESSS';
+    $data['data'] = $value;
+}
+
+// construcao da response
+
+function response($data_response){
+    header("Content-Type:application/json");
+    echo json_encode($data_response);
+}
+
+
+
+=================================================PREPARACAO DE NOVA API COM ACESSO A BASE DE DADOS================================================================
+
+- Abre o Laragon e clica no botao de base de dados vai abrir o HiediSQL, cria uma base de dados e da o nome de loja_api, depois disso cria a tabela clientes com os campos: id_cliente,
+nome, email, telefone, created_at, updated_at, deleted_at e cria a tabela produtos que terao os campos id_produto, produto, quantidade, created_at, updated_at, deleted_at
+
+- Depois disso cria um user para aceder especificamente a essa base de dados, da um nome e uma senha, adiciona o objeto que e a base de dados que vai aceder, da todas permissoes menos a GRANT e LOCK TABLES
+copia a pass para o novo projeto criado para nao esquecer, porque a pass e de muitos carateres, depois disso, cria dois clientes e 3 produtos, depois disso clica com botao direito na 
+base de dados e exporta a base de dados como SQL, seleciona as opcoes todas, seleciona a data como INSERT e seleciona o diretorio em que quer colocar a exportacao, nesse caso cria uma pasta chamada recursos dentro do projeto e seleciona a pasta
+para ser o diretorio da exportacao e da o nome de base_dados, cria uma pasta dentro da api chamada inc e coloca dentro dessa a pasta o file config que vai ter as constantes, e o file
+database que vai faezr a conexao com a base de dados e executa as queries.
+
+
+=================================================METODO PARA REQUEST GET OU POST NA APP CONSUMIDORA================================================================
+
+- Funcao da aplicacao para fazer requests de apis:
+
+<?php
+
+function api_request($endpoint, $method = 'GET', $variables = []){
+
+    // initiate the curl client
+    $client = curl_init();
+
+    // return the result as a string
+    curl_setopt($client, CURLOPT_RETURNTRANSFER, true);
+
+    // defines the url
+    $url = API_BASE_URL;
+
+    // if request is GET
+    if($method == 'GET'){ // Se o método da solicitação for GET, monta a URL da solicitação com o endpoint e quaisquer variáveis fornecidas.
+        $url .= "?endpoint=$endpoint";
+        if(!empty($variables)){
+            $url .= "&" . http_build_query($variables);
+        }
+    }
+
+    // if request is POST
+    if($method == 'POST'){ // Se o método da solicitação for POST, prepara os dados a serem enviados e define-os como o corpo da solicitação POST.
+        $variables = array_merge(['endpoint' => $endpoint], $variables);
+        curl_setopt($client, CURLOPT_POSTFIELDS, $variables);
+    }
+
+    curl_setopt($client, CURLOPT_URL, $url); // Define a URL da solicitação cURL
+    $response = curl_exec($client); //  Executa a solicitação cURL e armazena a resposta.
+    return json_decode($response, true); // Retorna a resposta decodificada como um array associativo
+
+
+}
+
+
+- index da aplicacao que consome a api:
+
+
+<?php
+
+// dependeces
+require_once('inc/config.php');
+require_once('inc/api_functions.php');
+
+$variables = [
+    'nome' => 'Padil',
+    'apelido' => 'Abdala',
+    'healty condition' => 'top',
+    'financial condition' => 'wealthy'
+];
+
+$results = api_request('status', 'GET', $variables);
+
+echo "<pre>";
+print_r($results);
+
+Resumindo, este arquivo index da API recebe solicitações, 
+verifica o método da solicitação, e então retorna uma resposta JSON contendo o status da requisição, o método utilizado e os dados enviados na requisição, se aplicável.
+
+
+Index da api:
+
+<?php
+header("Content-Type:application/json"); //  Define o cabeçalho HTTP para indicar que o conteúdo da resposta será em formato JSON. 
+//Isso é importante para informar ao cliente (geralmente um navegador da web ou outro aplicativo) que os dados retornados são em JSON
+
+$data['status'] = "SUCCESS";
+$data['method'] = $_SERVER['REQUEST_METHOD'];
+
+if($data['method'] == 'GET'){
+    $data['data'] = $_GET;
+}else if($data['method'] == 'POST'){
+    $data['data'] = $_POST;
+}
+
+echo json_encode($data);
+
+
+Resumindo, este arquivo index.php recebe solicitações, 
+verifica o método da solicitação, e então retorna uma resposta JSON contendo o status da requisição, o 
+método utilizado e os dados enviados na requisição, se aplicável.
+
+
+
+
+=================================================INICIO DO DESENVOLVIMENTO DA EDICAO DO CLIENTE================================================================
+
+- Para colocar um icone de pencil, em vez de usar fontawesome pode usar o html entity, pesquisa no google, html entity pencil, e vais encontrar algo como &#9998; que vai ser o proprio icone
+de pencil
+
+
+
+=================================================HTTP BASIC AUTHENTICATION================================================================
+
+- O que vimos ate aqui foi uma api publica, agora vamos ver uma api privada que para ser acedido precisara de autenticacao.
+
+
+- Codificando uma app que solicita a uma api com base em autenticacao:
+
+
+
+api_request("http://localhost/http_simple_autentication/api/", "Padil", "1234");
+
+function api_request($endpoint, $user, $pass){
+    $curl = curl_init($endpoint); // Esta linha inicializa uma nova sessão cURL com a URL fornecida no parâmetro $endpoint. Essa sessão cURL será usada para fazer a solicitação à API.
+
+    $headers = array(
+        'Content-Type: application/json', // Este cabeçalho indica ao servidor que o tipo de conteúdo sendo enviado na solicitação é JSON. Isso é útil para a API entender o formato dos dados enviados e responder adequadamente.
+        'Authorization: Basic ' . base64_encode("$user:$pass") // Este é um cabeçalho de autenticação básica. Ele contém as credenciais de usuário e senha codificadas em base64. Quando enviado com a solicitação, isso permite que o servidor autentique o usuário antes de processar a solicitação. É uma forma comum de autenticação em APIs HTTP.
+    );
+
+    curl_setopt($curl, CURLOPT_HTTPHEADER, $headers); // define os cabeçalhos da requisição que serão enviados para o servidor
+    curl_setopt($curl, CURLOPT_RETURNTRANSFER, 1); // define que a função curl_exec retornará o resultado da requisição como uma string em vez de imprimi-la diretamente
+
+    $response = curl_exec($curl); // Esta linha executa a solicitação cURL e armazena o resultado na variável $response
+
+    if(curl_errno($curl)){
+        throw new Exception(curl_error($curl));
+    }
+
+    curl_close($curl);
+
+    echo $response;
+}
+
+A contrucao do codigo da api para a resposta em base da solicitacao da app:
+
+
+<?php
+
+$user = $_SERVER['PHP_AUTH_USER'];
+$pass = $_SERVER['PHP_AUTH_PW'];
+
+echo json_encode([
+    'user' => $user,
+    'pass' => $pass,
+    'status' => 'SUCCESS'
+]);
+
